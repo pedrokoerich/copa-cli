@@ -1,0 +1,141 @@
+@startuml copa-cli
+title Sistema de Gerenciamento de Copa do Mundo - Diagrama de Classes
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+' ----------------------------- Modelo base -----------------------------
+
+class Time {
+  - nome : String
+  - pais : String
+  - grupo : String
+  + getNome() : String
+  + getPais() : String
+  + getGrupo() : String
+  + setGrupo(String) : void
+  + equals(Object) : boolean
+  + hashCode() : int
+}
+
+enum StatusPartida {
+  AGENDADA
+  ENCERRADA
+}
+
+class Partida {
+  - golsCasa : int
+  - golsVisitante : int
+  - penaltisCasa : int
+  - penaltisVisitante : int
+  - tevePenaltis : boolean
+  - status : StatusPartida
+  + registrarResultado(int, int) : void
+  + registrarPenaltis(int, int) : void
+  + getVencedor() : Time
+  + isEmpateTempoNormal() : boolean
+  + descricao() : String
+}
+
+class ClassificacaoGrupo {
+  - pontos : int
+  - vitorias : int
+  - empates : int
+  - derrotas : int
+  - golsPro : int
+  - golsContra : int
+  + {static} POR_DESEMPENHO : Comparator<ClassificacaoGrupo>
+  + registrar(int, int) : void
+  + getSaldoGols() : int
+}
+
+' --------------------------- Hierarquia de Fase -------------------------
+
+abstract class Fase {
+  # nome : String
+  # partidas : List<Partida>
+  + {abstract} iniciar(List<Time>) : void
+  + {abstract} exibirStatus() : void
+  + {abstract} getClassificados() : List<Time>
+  + registrarResultado(int, int, int) : void
+  + todasEncerradas() : boolean
+  + isIniciada() : boolean
+}
+
+class FaseGrupos {
+  - grupos : Map<String, List<Time>>
+  - tabelas : Map<String, List<ClassificacaoGrupo>>
+  + iniciar(List<Time>) : void
+  + exibirStatus() : void
+  + getClassificados() : List<Time>
+}
+
+class FaseEliminatoria {
+  - nomeFase : String
+  + iniciar(List<Time>) : void
+  + exibirStatus() : void
+  + getClassificados() : List<Time>
+}
+
+' ------------------------------ Orquestrador ----------------------------
+
+class Torneio {
+  - nome : String
+  - faseAtual : int
+  + getFaseAtual() : Fase
+  + iniciarPrimeiraFase() : void
+  + avancarFase() : void
+  + getCampeao() : Time
+  + adicionarTime(Time) : void
+}
+
+' ------------------------------ Persistencia ----------------------------
+
+class ArquivoUtil <<utility>> {
+  + {static} salvar(Torneio, String) : void
+  + {static} carregar(String) : Torneio
+}
+
+class FaseAdapter {
+  + serialize(Fase, Type, JsonSerializationContext) : JsonElement
+  + deserialize(JsonElement, Type, JsonDeserializationContext) : Fase
+}
+
+interface "JsonSerializer<Fase>" as JS
+interface "JsonDeserializer<Fase>" as JD
+
+' ----------------------------- Interface terminal -----------------------
+
+class Menu {
+  - torneio : Torneio
+  + {static} main(String[]) : void
+  + exibirMenuPrincipal() : void
+  + menuTimes() : void
+  + menuFaseAtual() : void
+  + menuClassificacao() : void
+}
+
+' ------------------------------ Relacionamentos -------------------------
+
+Fase <|-- FaseGrupos
+Fase <|-- FaseEliminatoria
+
+Partida "1" --> "1" StatusPartida
+Partida "1" --> "2" Time : casa / visitante
+ClassificacaoGrupo "1" --> "1" Time
+Fase "1" *-- "*" Partida : composicao
+
+Torneio "1" *-- "*" Fase : composicao (polimorfismo)
+Torneio "1" *-- "*" Time : composicao
+FaseGrupos "1" o-- "*" ClassificacaoGrupo
+
+ArquivoUtil ..> Torneio : salva / carrega
+ArquivoUtil ..> FaseAdapter : registra
+FaseAdapter ..|> JS
+FaseAdapter ..|> JD
+FaseAdapter ..> Fase
+
+Menu "1" --> "1" Torneio
+Menu ..> ArquivoUtil
+
+@enduml
